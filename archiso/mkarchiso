@@ -158,23 +158,23 @@ _cleanup_pacstrap_dir() {
     _msg_info "Cleaning up in pacstrap location..."
 
     # Delete all files in /boot
-    [[ -d "${pacstrap_dir}/boot" ]] && find "${pacstrap_dir}/boot" -mindepth 1 -delete
+    [[ -d "${pacstrap_dir}/boot" ]] && _unshare find "${pacstrap_dir}/boot" -mindepth 1 -delete
     # Delete pacman database sync cache files (*.tar.gz)
-    [[ -d "${pacstrap_dir}/var/lib/pacman" ]] && find "${pacstrap_dir}/var/lib/pacman" -maxdepth 1 -type f -delete
+    [[ -d "${pacstrap_dir}/var/lib/pacman" ]] && _unshare find "${pacstrap_dir}/var/lib/pacman" -maxdepth 1 -type f -delete
     # Delete pacman database sync cache
-    [[ -d "${pacstrap_dir}/var/lib/pacman/sync" ]] && find "${pacstrap_dir}/var/lib/pacman/sync" -delete
+    [[ -d "${pacstrap_dir}/var/lib/pacman/sync" ]] && _unshare find "${pacstrap_dir}/var/lib/pacman/sync" -delete
     # Delete pacman package cache
-    [[ -d "${pacstrap_dir}/var/cache/pacman/pkg" ]] && find "${pacstrap_dir}/var/cache/pacman/pkg" -type f -delete
+    [[ -d "${pacstrap_dir}/var/cache/pacman/pkg" ]] && _unshare find "${pacstrap_dir}/var/cache/pacman/pkg" -type f -delete
     # Delete all log files, keeps empty dirs.
-    [[ -d "${pacstrap_dir}/var/log" ]] && find "${pacstrap_dir}/var/log" -type f -delete
+    [[ -d "${pacstrap_dir}/var/log" ]] && _unshare find "${pacstrap_dir}/var/log" -type f -delete
     # Delete all temporary files and dirs
-    [[ -d "${pacstrap_dir}/var/tmp" ]] && find "${pacstrap_dir}/var/tmp" -mindepth 1 -delete
+    [[ -d "${pacstrap_dir}/var/tmp" ]] && _unshare find "${pacstrap_dir}/var/tmp" -mindepth 1 -delete
     # Delete package pacman related files.
-    find "${work_dir}" \( -name '*.pacnew' -o -name '*.pacsave' -o -name '*.pacorig' \) -delete
+    _unshare find "${work_dir}" \( -name '*.pacnew' -o -name '*.pacsave' -o -name '*.pacorig' \) -delete
     # Create /etc/machine-id with special value 'uninitialized': the final id is
     # generated on first boot, systemd's first-boot mechanism applies (see machine-id(5))
-    rm -f -- "${pacstrap_dir}/etc/machine-id"
-    printf 'uninitialized\n' >"${pacstrap_dir}/etc/machine-id"
+    _unshare rm -f -- "${pacstrap_dir}/etc/machine-id"
+    printf 'uninitialized\n' | _unshare install -m 0444 /dev/stdin "${pacstrap_dir}/etc/machine-id"
 
     _msg_info "Done!"
 }
@@ -182,10 +182,12 @@ _cleanup_pacstrap_dir() {
 # Create a squashfs image and place it in the ISO 9660 file system.
 # $@: options to pass to mksquashfs
 _run_mksquashfs() {
-    local mksquashfs_options=() image_path="${isofs_dir}/${install_dir}/${arch}/airootfs.sfs"
+    local mksquashfs_options=() image_path="${isofs_dir}/${install_dir}/${arch}/airootfs.sfs" image_source="$1"
     rm -f -- "${image_path}"
+    [[ -d "$image_source" ]] || mksquashfs_options+=('-root-mode' '0755')
     [[ ! "${quiet}" == "y" ]] || mksquashfs_options+=('-no-progress' '-quiet')
-    mksquashfs "$@" "${image_path}" -noappend "${airootfs_image_tool_options[@]}" "${mksquashfs_options[@]}"
+    _unshare mksquashfs "${image_source}" "${image_path}" \
+        -noappend "${airootfs_image_tool_options[@]}" "${mksquashfs_options[@]}"
 }
 
 # Create an ext4 image containing the root file system and pack it inside a squashfs image.
@@ -208,7 +210,7 @@ _mkairootfs_ext4+squashfs() {
     )
     [[ ! "${quiet}" == "y" ]] || mkfs_ext4_options+=('-q')
     rm -f -- "${pacstrap_dir}.img"
-    mkfs.ext4 "${mkfs_ext4_options[@]}" -- "${pacstrap_dir}.img" 32G
+    _unshare mkfs.ext4 "${mkfs_ext4_options[@]}" -- "${pacstrap_dir}.img" 32G
     _msg_info "Done!"
 
     install -d -m 0755 -- "${isofs_dir}/${install_dir}/${arch}"
@@ -238,7 +240,7 @@ _mkairootfs_erofs() {
     [[ ! "${quiet}" == "y" ]] || mkfs_erofs_options+=('--quiet')
     mkfs_erofs_options+=('-U' '00000000-0000-0000-0000-000000000000' "${airootfs_image_tool_options[@]}")
     _msg_info "Creating EROFS image, this may take some time..."
-    mkfs.erofs "${mkfs_erofs_options[@]}" -- "${image_path}" "${pacstrap_dir}"
+    _unshare mkfs.erofs "${mkfs_erofs_options[@]}" -- "${image_path}" "${pacstrap_dir}"
     _msg_info "Done!"
 }
 
@@ -309,11 +311,11 @@ _make_custom_airootfs() {
     local passwd=()
     local filename permissions
 
-    install -d -m 0755 -o 0 -g 0 -- "${pacstrap_dir}"
+    _unshare install -d -m 0755 -o 0 -g 0 -- "${pacstrap_dir}"
 
     if [[ -d "${profile}/airootfs" ]]; then
         _msg_info "Copying custom airootfs files..."
-        cp -af --no-preserve=ownership,mode -- "${profile}/airootfs/." "${pacstrap_dir}"
+        _unshare cp -af --no-preserve=ownership,mode -- "${profile}/airootfs/." "${pacstrap_dir}"
         # Set ownership and mode for files and directories
         for filename in "${!file_permissions[@]}"; do
             IFS=':' read -ra permissions <<<"${file_permissions["${filename}"]}"
@@ -325,11 +327,11 @@ _make_custom_airootfs() {
                 _msg_warning "Cannot change permissions of '${pacstrap_dir}${filename}'. The file or directory does not exist."
             else
                 if [[ "${filename: -1}" == "/" ]]; then
-                    chown -fhR -- "${permissions[0]}:${permissions[1]}" "${pacstrap_dir}${filename}"
-                    chmod -fR -- "${permissions[2]}" "${pacstrap_dir}${filename}"
+                    _unshare chown -fhR -- "${permissions[0]}:${permissions[1]}" "${pacstrap_dir}${filename}"
+                    _unshare chmod -fR -- "${permissions[2]}" "${pacstrap_dir}${filename}"
                 else
-                    chown -fh -- "${permissions[0]}:${permissions[1]}" "${pacstrap_dir}${filename}"
-                    chmod -f -- "${permissions[2]}" "${pacstrap_dir}${filename}"
+                    _unshare chown -fh -- "${permissions[0]}:${permissions[1]}" "${pacstrap_dir}${filename}"
+                    _unshare chmod -f -- "${permissions[2]}" "${pacstrap_dir}${filename}"
                 fi
             fi
         done
@@ -339,6 +341,13 @@ _make_custom_airootfs() {
 
 # Install desired packages to the root file system
 _make_packages() {
+    local -a _pacstrap_options
+
+    _pacstrap_options=(-C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" "${buildmode_pkg_list[@]}")
+    if (( EUID != 0 )); then
+        _pacstrap_options=(-N "${_pacstrap_options[@]}")
+    fi
+
     _msg_info "Installing packages to '${pacstrap_dir}/'..."
 
     if [[ -v gpg_publickey ]]; then
@@ -354,12 +363,11 @@ _make_packages() {
         export ARCHISO_TLSCA_FD
     fi
 
-
     # Unset TMPDIR to work around https://bugs.archlinux.org/task/70580
     if [[ "${quiet}" = "y" ]]; then
-        env -u TMPDIR pacstrap -C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" "${buildmode_pkg_list[@]}" >/dev/null
+        env -u TMPDIR pacstrap "${_pacstrap_options[@]}" >/dev/null
     else
-        env -u TMPDIR pacstrap -C "${work_dir}/${buildmode}.pacman.conf" -c -G -M -- "${pacstrap_dir}" "${buildmode_pkg_list[@]}"
+        env -u TMPDIR pacstrap "${_pacstrap_options[@]}"
     fi
 
     if [[ -v cert_list[0] ]]; then
@@ -393,11 +401,11 @@ _make_customize_airootfs() {
             # Prevent path traversal outside of $pacstrap_dir
             if [[ "$(realpath -q -- "${pacstrap_dir}${passwd[5]}")" == "${pacstrap_dir}"* ]]; then
                 if [[ ! -d "${pacstrap_dir}${passwd[5]}" ]]; then
-                    install -d -m 0750 -o "${passwd[2]}" -g "${passwd[3]}" -- "${pacstrap_dir}${passwd[5]}"
+                    _unshare install -d -m 0750 -o "${passwd[2]}" -g "${passwd[3]}" -- "${pacstrap_dir}${passwd[5]}"
                 fi
-                cp -dRT --update=none --preserve=mode,timestamps,links -- "${pacstrap_dir}/etc/skel/." "${pacstrap_dir}${passwd[5]}"
-                chmod -f 0750 -- "${pacstrap_dir}${passwd[5]}"
-                chown -hR -- "${passwd[2]}:${passwd[3]}" "${pacstrap_dir}${passwd[5]}"
+                _unshare cp -dRT --update=none --preserve=mode,timestamps,links -- "${pacstrap_dir}/etc/skel/." "${pacstrap_dir}${passwd[5]}"
+                _unshare chmod -f 0750 -- "${pacstrap_dir}${passwd[5]}"
+                _unshare chown -hR -- "${passwd[2]}:${passwd[3]}" "${pacstrap_dir}${passwd[5]}"
             else
                 _msg_error "Failed to set permissions on '${pacstrap_dir}${passwd[5]}'. Outside of valid path." 1
             fi
@@ -408,10 +416,14 @@ _make_customize_airootfs() {
     if [[ -e "${pacstrap_dir}/root/customize_airootfs.sh" ]]; then
         _msg_info "Running customize_airootfs.sh in '${pacstrap_dir}' chroot..."
         _msg_warning "customize_airootfs.sh is deprecated! Support for it will be removed in a future archiso version."
-        chmod -f -- +x "${pacstrap_dir}/root/customize_airootfs.sh"
+        _unshare chmod -f -- +x "${pacstrap_dir}/root/customize_airootfs.sh"
         # Unset TMPDIR to work around https://bugs.archlinux.org/task/70580
-        eval -- env -u TMPDIR arch-chroot "${pacstrap_dir}" "/root/customize_airootfs.sh"
-        rm -- "${pacstrap_dir}/root/customize_airootfs.sh"
+        if (( EUID != 0 )); then
+            eval -- env -u TMPDIR arch-chroot -N "${pacstrap_dir}" "/root/customize_airootfs.sh"
+        else
+            eval -- env -u TMPDIR arch-chroot "${pacstrap_dir}" "/root/customize_airootfs.sh"
+        fi
+        _unshare rm -- "${pacstrap_dir}/root/customize_airootfs.sh"
         _msg_info "Done! customize_airootfs.sh run successfully."
     fi
 }
@@ -1441,7 +1453,7 @@ _build_bootstrap_image() {
 
     _msg_info "Creating bootstrap image..."
     rm -f -- "${out_dir:?}/${image_name:?}"
-    bsdtar -cf - "root.${arch}" "pkglist.${arch}.txt" 'version' \
+    _unshare bsdtar -cf - "root.${arch}" "pkglist.${arch}.txt" 'version' \
         | "${bootstrap_tarball_compression[@]}" >"${out_dir}/${image_name}"
     _msg_info "Done!"
     du -h -- "${out_dir}/${image_name}"
@@ -1454,7 +1466,7 @@ _build_iso_image() {
     # The creation of the airootfs image has already been completed.
     if (( rm_work_dir )); then
         _msg_info 'Removing pacstrap directory...'
-        rm -rf -- "${work_dir:?}/${arch}/airootfs"
+        _unshare rm -rf -- "${work_dir:?}/${arch}/airootfs"
     fi
 
     local xorriso_options=() xorrisofs_options=()
@@ -1657,8 +1669,8 @@ _make_version() {
 
     if [[ "${buildmode}" == @("iso"|"netboot") ]]; then
         # Write version file to system installation dir
-        rm -f -- "${pacstrap_dir}/version"
-        printf '%s\n' "${iso_version}" >"${pacstrap_dir}/version"
+        _unshare rm -f -- "${pacstrap_dir}/version"
+        printf '%s\n' "${iso_version}" | _unshare install -m 0644 /dev/stdin "${pacstrap_dir}/version"
 
         install -d -m 0755 -- "${isofs_dir}/${install_dir}"
         # Write version file to ISO 9660
@@ -1692,13 +1704,13 @@ _make_version() {
     if [[ "${_os_release}" != "${pacstrap_dir}"* ]]; then
         _msg_warning "os-release file '${_os_release}' is outside of valid path."
     else
-        [[ ! -e "${_os_release}" ]] || sed -i '/^IMAGE_ID=/d;/^IMAGE_VERSION=/d' "${_os_release}"
-        printf 'IMAGE_ID=%s\nIMAGE_VERSION=%s\n' "${iso_name}" "${iso_version}" >>"${_os_release}"
+        [[ ! -e "${_os_release}" ]] || _unshare sed -i -- '/^IMAGE_ID=/d;/^IMAGE_VERSION=/d' "${_os_release}"
+        printf 'IMAGE_ID=%s\nIMAGE_VERSION=%s\n' "${iso_name}" "${iso_version}" | _unshare tee -a "${_os_release}" >/dev/null
     fi
 
     # Touch /usr/lib/clock-epoch to give another hint on date and time
     # for systems with screwed or broken RTC.
-    touch -m -d"@${SOURCE_DATE_EPOCH}" -- "${pacstrap_dir}/usr/lib/clock-epoch"
+    _unshare touch -m -d"@${SOURCE_DATE_EPOCH}" -- "${pacstrap_dir}/usr/lib/clock-epoch"
 
     _msg_info "Done!"
 }
@@ -1707,7 +1719,8 @@ _make_pkglist() {
     _msg_info "Creating a list of installed packages on live-enviroment..."
     case "${buildmode}" in
         "bootstrap")
-            pacman -Q --sysroot "${pacstrap_dir}" >"${bootstrap_parent}/pkglist.${arch}.txt"
+            pacman -Q --sysroot "${pacstrap_dir}" \
+                | _unshare install -m 0644 /dev/stdin "${bootstrap_parent}/pkglist.${arch}.txt"
             ;;
         "iso"|"netboot")
             install -d -m 0755 -- "${isofs_dir}/${install_dir}"
@@ -1775,7 +1788,7 @@ _build_buildmode_bootstrap() {
     pacstrap_dir="${work_dir}/${arch}/bootstrap/root.${arch}"
     bootstrap_parent="$(dirname -- "${pacstrap_dir}")"
     [[ -d "${work_dir}" ]] || install -d -- "${work_dir}"
-    install -d -m 0755 -o 0 -g 0 -- "${pacstrap_dir}"
+    _unshare install -d -m 0755 -o 0 -g 0 -- "${pacstrap_dir}"
 
     # Set tarball extension
     case "${bootstrap_tarball_compression[0]}" in
@@ -1839,6 +1852,14 @@ _build() {
     fi
 }
 
+_unshare() {
+    if (( EUID != 0 )); then
+        unshare --map-auto --map-root-user -- "$@"
+    else
+        "$@"
+    fi
+}
+
 while getopts 'c:p:C:L:P:A:D:w:m:o:g:G:vrh?' arg; do
     case "${arg}" in
         p) read -r -a override_pkg_list <<<"${OPTARG}" ;;
@@ -1868,10 +1889,6 @@ shift $((OPTIND - 1))
 if (( $# < 1 )); then
     _msg_error "No profile specified" 0
     _usage 1
-fi
-
-if (( EUID != 0 )); then
-    _msg_error "${app_name} must be run as root." 1
 fi
 
 # get the absolute path representation of the first non-option argument

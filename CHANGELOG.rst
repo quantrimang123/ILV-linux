@@ -10,6 +10,8 @@ Added
 
 - Add ghostty-terminfo and kmscon-terminfo packages to releng to support terminal emulators using them. E.g. when
   installing via SSH.
+- Support running ``mkarchiso`` as a regular (non-root) user by using ``unshare``. This requires user namespace support
+  in the kernel.
 
 Changed
 -------

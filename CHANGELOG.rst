@@ -14,6 +14,9 @@ Added
 Changed
 -------
 
+- Replaced the ``ntfs-3g`` package with the ``ntfsprogs`` package in the releng profile since we do not require the FUSE
+  driver, but only the userspace utilities. For now, ``ntfs-3g`` still gets pulled in as a dependency of other packages.
+
 Deprecated
 ----------
 

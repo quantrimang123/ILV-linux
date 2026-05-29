@@ -8,6 +8,9 @@ Changelog
 Added
 -----
 
+- Add ghostty-terminfo and kmscon-terminfo packages to releng to support terminal emulators using them. E.g. when
+  installing via SSH.
+
 Changed
 -------
 

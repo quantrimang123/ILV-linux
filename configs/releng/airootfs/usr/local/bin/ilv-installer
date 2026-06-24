@@ -1,37 +1,55 @@
 #!/bin/bash
-
+set-e
 # Kiểm tra quyền root
-if [[ $EUID -ne 0 ]]; then
-   echo "Phải chạy dưới quyền root (sudo)" 
-   exit 1
+[[ $EUID -ne 0 ]] && { echo "Cần chạy với sudo"; exit 1; }
+
+# 1. Chọn ổ đĩa
+target=$(lsblk -dno NAME,SIZE | grep -E "nvme|sd" | whiptail --title "Chọn ổ đĩa" --menu "Chọn ổ để cài đặt:" 15 60 4 3>&1 1>&2 2>&3)
+[[ -z "$target" ]] && exit 0
+device="/dev/$target"
+
+# 2. Phân vùng tự động (Auto-Partition)
+if (whiptail --title "Cảnh báo" --yesno "DỮ LIỆU TRÊN $device SẼ BỊ XÓA HẾT. Tiếp tục?" 10 60); then
+    sgdisk --zap-all $device
+    sgdisk -n 1:0:+512M -t 1:ef00 $device # EFI
+    sgdisk -n 2:0:0 -t 2:8300 $device     # Root
+    mkfs.vfat -F32 "${device}1"
+    mkfs.ext4 -F "${device}2"
+    mount "${device}2" /mnt
+    mkdir -p /mnt/boot/efi
+    mount "${device}1" /mnt/boot/efi
+else
+    exit 0
 fi
 
-# Hàm tạo Menu
-show_menu() {
-    whiptail --title "ILV-LINUX INSTALLER" --menu "Chọn công việc bạn muốn làm:" 15 60 4 \
-    "1" "Phân vùng ổ đĩa (Disk Partition)" \
-    "2" "Cài đặt hệ thống cơ bản" \
-    "3" "Thiết lập cấu hình mạng" \
-    "4" "Thoát" 3>&1 1>&2 2>&3
-}
+# 3. Cài đặt hệ thống
+# Cần dùng pacstrap. Nếu đang ở môi trường Live ISO, dùng luôn mirrorlist hiện tại
+pacstrap /mnt base linux linux-firmware nano networkmanager || { echo "Lỗi cài đặt!"; exit 1; }
 
-# Vòng lặp Menu
-choice=$(show_menu)
-case $choice in
-    1)
-        # Gọi lệnh phân vùng (ví dụ cfdisk)
-        cfdisk /dev/nvme0n1 || cfdisk /dev/sda
-        ;;
-    2)
-        # Gọi lệnh pacstrap (cần cấu hình mount point trước)
-        echo "Đang cài đặt..."
-        pacstrap /mnt base linux linux-firmware nano
-        ;;
-    3)
-        # Gọi script cấu hình mạng của bạn
-        nmtui
-        ;;
-    *)
-        exit 0
-        ;;
-esac
+# 4. Generate fstab
+genfstab -U /mnt >> /mnt/etc/fstab
+
+cat <<EOF > /mnt/setup_final.sh
+
+pacman -S --noconfirm grub efibootmgr
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ILVLinux --removable
+grub-mkconfig -o /boot/grub/grub.cfg
+
+ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
+hwclock --systohc
+echo "ilvlinux" > /etc/hostname
+
+systemctl enable NetworkManager
+echo "root:123456" | chpasswd
+useradd -m -G wheel ilvuser
+echo "ilvuser:123456" | chpasswd
+
+pacman -S --noconfirm sudo
+echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
+EOF
+
+chmod +x /mnt/setup_final.sh
+arch-chroot /mnt ./setup_final.sh
+rm /mnt/setup_final.sh
+
+whiptail --msgbox "Cài đặt hoàn tất! Bạn hãy restart máy." 10 40

@@ -11,6 +11,11 @@ fi
 echo "Đang khởi động tiến trình cài đặt tự động ILV-LINUX..."
 archinstall --config /root/ilv_config.json
 
+if [ $? -eq 0 ]; then
+    touch /etc/ilv_installed
+    echo "Cài đặt thành công! File flag đã được tạo."
+fi
+
 echo "------------------------------------------"
 echo "Cài đặt xong! Hãy khởi động lại máy."
 echo "------------------------------------------"

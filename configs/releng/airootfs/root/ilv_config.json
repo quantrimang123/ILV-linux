@@ -1,26 +1,27 @@
 {
-  "profile": {
-    "path": "desktop",
-    "name": "hyprland"
-  },
+  "profile": { "path": "desktop", "name": "hyprland" },
   "keyboard-layout": "us",
   "timezone": "Asia/Ho_Chi_Minh",
-  "nic": {
-    "network-configuration": "dhcp"
-  },
-  "disk_config": {
-    "device_selection": {
-      "select_disk": ["/dev/nvme0n1", "/dev/sda"],
+  "nic": { "network-configuration": "dhcp" },
+  "disk_layouts": [
+    {
+      "device": "/dev/nvme0n1",
+      "config_type": "partition",
       "partitions": [
+        {
+          "mountpoint": "/boot",
+          "size": "512M",
+          "type": "fat32"
+        },
         {
           "mountpoint": "/",
           "size": "100%",
           "type": "ext4"
         }
       ]
-    },
-    "wipe": true
-  },
+    }
+  ],
+  "wipe": true,
   "bootloader": "grub",
   "swap": true,
   "hostname": "ilvlinux",

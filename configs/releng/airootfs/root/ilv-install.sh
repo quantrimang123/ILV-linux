@@ -7,21 +7,40 @@ if ! ping -c 1 archlinux.org &> /dev/null; then
     echo "Không có internet! Vui lòng dùng 'nmtui' để kết nối trước."
     exit 1
 fi
+
+if [ -b "/dev/nvme0n1" ]; then
+    TARGET_DISK="/dev/nvme0n1"
+elif [ -b "/dev/vda" ]; then
+    TARGET_DISK="/dev/vda"
+elif [ -b "/dev/sda" ]; then
+    TARGET_DISK="/dev/sda"
+else
+    echo "Không tìm thấy ổ đĩa phù hợp!"
+    exit 1
+fi
+
+echo "Đã phát hiện ổ đĩa mục tiêu: $TARGET_DISK"
 read -p "Nhập username: " input_user
 read -s -p "Nhập mật khẩu: " input_pass
 echo ""
-jq --arg user "$input_user" --arg pass "$input_pass" \
-   '.users[0].username = $user | .users[0].password = $pass' \
+
+jq --arg disk "$TARGET_DISK" \
+   --arg user "$input_user" \
+   --arg pass "$input_pass" \
+   '.disk_layouts[0].device = $disk | .users[0].username = $user | .users[0].password = $pass' \
    ilv_config.json > ilv_config_tmp.json
    
-echo "Đang khởi tạo cấu hình..."
-echo "Đang khởi động tiến trình cài đặt tự động ILV-LINUX..."
+echo "Đang khởi chạy cài đặt trên $TARGET_DISK..."
+set +e
 archinstall --config ilv_config_tmp.json
-if [ $? -eq 0 ]; then
+INSTALL_STATUS=$?
+set -e
+if [ $INSTALL_STATUS -eq 0 ]; then
+    echo "Cài đặt thành công."
     touch /etc/ilv_installed
-    echo "Cài đặt thành công! File flag đã được tạo."
+    rm ilv_config_tmp.json 
+else
+    echo "Cài đặt thất bại (Mã: $INSTALL_STATUS)."
+    echo "File cấu hình tạm giữ tại: $(pwd)/ilv_config_tmp.json"
+    exit $INSTALL_STATUS
 fi
-rm ilv_config_tmp.json
-echo "------------------------------------------"
-echo "Cài đặt xong! Hãy khởi động lại máy."
-echo "------------------------------------------"

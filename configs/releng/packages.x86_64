@@ -1,4 +1,6 @@
 alsa-utils
+util-linux
+whiptail
 fastfetch
 most
 bash-completion

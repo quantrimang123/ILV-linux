@@ -17,8 +17,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pacman -Sy --noconfirm archiso squashfs-tools dosfstools mtools base-devel
-
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm archiso squashfs-tools dosfstools mtools base-devel reflector
+          reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+          pacman -Syu --noconfirm
       - name: Setup Profile
         run: |
           cd configs/releng/

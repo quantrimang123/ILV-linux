@@ -2,7 +2,7 @@ name: Build ILV-Linux ISO
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:

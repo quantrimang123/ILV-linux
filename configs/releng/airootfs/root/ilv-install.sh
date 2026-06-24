@@ -1,24 +1,27 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 cleanup() {
-    rm -f ilv_config_tmp.json
+    [[ -n "${ILV_TMPFILE:-}" ]] && rm -f -- "$ILV_TMPFILE"
 }
 trap cleanup EXIT
 
 [[ $EUID -ne 0 ]] && { echo "Cần quyền root"; exit 1; }
 
-command -v jq &> /dev/null || { echo "jq không được cài đặt"; exit 1; }
-command -v archinstall &> /dev/null || { echo "archinstall không được cài đặt"; exit 1; }
+# Kiểm tra các công cụ cần thiết
+for cmd in jq archinstall reflector ping; do
+    command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd không được cài đặt"; exit 1; }
+done
 
 echo "Đang tối ưu hóa tốc độ tải..."
 reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
 
-if ! ping -c 1 archlinux.org &> /dev/null; then
+if ! ping -c 1 archlinux.org >/dev/null 2>&1; then
     echo "Không có internet! Vui lòng dùng 'nmtui' để kết nối trước."
     exit 1
 fi
 
+# Tìm ổ đĩa mục tiêu (thứ tự ưu tiên)
 if [ -b "/dev/nvme0n1" ]; then
     TARGET_DISK="/dev/nvme0n1"
 elif [ -b "/dev/vda" ]; then
@@ -32,21 +35,51 @@ fi
 
 echo "Đã phát hiện ổ đĩa mục tiêu: $TARGET_DISK"
 read -p "Nhập username: " input_user
+while [[ -z "${input_user}" ]]; do
+    echo "Username không được để trống."
+    read -p "Nhập username: " input_user
+done
+
 read -s -p "Nhập mật khẩu: " input_pass
 echo ""
+while [[ -z "${input_pass}" ]]; do
+    echo "Mật khẩu không được để trống."
+    read -s -p "Nhập mật khẩu: " input_pass
+    echo ""
+done
 
-jq --arg disk "$TARGET_DISK" \
-   --arg user "$input_user" \
-   --arg pass "$input_pass" \
-   '.disk_layouts[0].device = $disk | .users[0].username = $user | .users[0].password = $pass' \
-   ilv_config.json > ilv_config_tmp.json
-   
+# Tìm file cấu hình (giả sử cùng thư mục với script)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/ilv_config.json"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "Không tìm thấy $CONFIG_FILE"
+    unset input_pass
+    exit 1
+fi
+
+# Tạo file tạm an toàn
+ILV_TMPFILE="$(mktemp /tmp/ilv_config_tmp.XXXXXX.json)"
+chmod 600 "$ILV_TMPFILE"
+
+# Cập nhật cấu hình: tạo user có sudo (không thiết lập root-password)
+if ! jq --arg disk "$TARGET_DISK" --arg user "$input_user" --arg pass "$input_pass" \
+    '.disk_layouts = (.disk_layouts // {})
+     | .disk_layouts[$disk] = (.disk_layouts[$disk] // {"wipe": true, "partitions": [{"size":"512M","type":"efi","mountpoint":"/boot"},{"size":"100%","type":"linux-filesystem","mountpoint":"/"}], "bootloader":"systemd-boot"})
+     | .users = (.users // {})
+     | .users[$user] = {"password": $pass, "sudo": true, "groups": ["wheel"], "shell": "/bin/bash"}' \
+    "$CONFIG_FILE" > "$ILV_TMPFILE"; then
+    echo "Lỗi khi cập nhật cấu hình với jq."
+    unset input_pass
+    exit 1
+fi
+
+# Xóa biến chứa mật khẩu trong shell
 unset input_pass
-chmod 600 ilv_config_tmp.json
 
 echo "Đang khởi chạy cài đặt trên $TARGET_DISK..."
 set +e
-archinstall --config "$(pwd)/ilv_config_tmp.json"
+archinstall --config "$ILV_TMPFILE"
 INSTALL_STATUS=$?
 set -e
 

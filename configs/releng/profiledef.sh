@@ -21,4 +21,6 @@ file_permissions=(
   ["/usr/local/bin/Installation_guide"]="0:0:755"
   ["/usr/local/bin/livecd-sound"]="0:0:755"
   ["/etc/skel/.bashrc"]="0:0:644"
+  ["/etc/sudoers.d"]="0:0:750"
+  ["/etc/NetworkManager/dispatcher.d/09-timezone"]="0:0:755"
 )

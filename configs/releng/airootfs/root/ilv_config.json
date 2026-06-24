@@ -9,7 +9,7 @@
       "config_type": "partition",
       "partitions": [
         {
-          "mountpoint": "/boot",
+          "mountpoint": "/boot/efi",
           "size": "512M",
           "type": "fat32"
         },
@@ -25,7 +25,7 @@
   "bootloader": "grub",
   "swap": true,
   "hostname": "ilvlinux",
-"users": [
+  "users": [
     {
       "username": "USER_PLACEHOLDER",
       "password": "PASS_PLACEHOLDER",

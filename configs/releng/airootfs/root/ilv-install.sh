@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+
 cleanup() {
     rm -f ilv_config_tmp.json
 }
@@ -39,12 +40,13 @@ jq --arg disk "$TARGET_DISK" \
    --arg pass "$input_pass" \
    '.disk_layouts[0].device = $disk | .users[0].username = $user | .users[0].password = $pass' \
    ilv_config.json > ilv_config_tmp.json
-
+   
+unset input_pass
 chmod 600 ilv_config_tmp.json
 
 echo "Đang khởi chạy cài đặt trên $TARGET_DISK..."
 set +e
-archinstall --config ilv_config_tmp.json
+archinstall --config "$(pwd)/ilv_config_tmp.json"
 INSTALL_STATUS=$?
 set -e
 

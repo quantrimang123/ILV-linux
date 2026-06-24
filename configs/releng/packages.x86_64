@@ -1,6 +1,7 @@
 alsa-utils
 util-linux
-whiptail
+newt
+networkmanager
 fastfetch
 most
 bash-completion

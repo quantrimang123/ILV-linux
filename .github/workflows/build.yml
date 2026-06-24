@@ -1,0 +1,37 @@
+name: Build ILV-Linux ISO
+
+on:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pacman -Sy --noconfirm archiso squashfs-tools dosfstools mtools base-devel
+
+      - name: Setup Profile
+        run: |
+          cd configs/releng/
+          find . -name "mkinitcpio.conf" -delete
+          find . -name "mkinitcpio.d" -exec rm -rf {} +
+      - name: Build ISO
+        run: |
+          rm -rf /tmp/archiso-tmp
+          mkdir -p out
+          mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: ILV-Linux-ISO
+          path: out/*.iso
+          retention-days: 7

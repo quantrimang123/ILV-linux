@@ -25,10 +25,10 @@
   "bootloader": "grub",
   "swap": true,
   "hostname": "ilvlinux",
-  "users": [
+"users": [
     {
-      "username": "ilvuser",
-      "password": "123456",
+      "username": "USER_PLACEHOLDER",
+      "password": "PASS_PLACEHOLDER",
       "sudo": true
     }
   ],

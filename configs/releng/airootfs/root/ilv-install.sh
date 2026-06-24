@@ -1,8 +1,18 @@
 #!/bin/bash
 set -e
+cleanup() {
+    rm -f ilv_config_tmp.json
+}
+trap cleanup EXIT
+
 [[ $EUID -ne 0 ]] && { echo "Cần quyền root"; exit 1; }
+
+command -v jq &> /dev/null || { echo "jq không được cài đặt"; exit 1; }
+command -v archinstall &> /dev/null || { echo "archinstall không được cài đặt"; exit 1; }
+
 echo "Đang tối ưu hóa tốc độ tải..."
 reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
+
 if ! ping -c 1 archlinux.org &> /dev/null; then
     echo "Không có internet! Vui lòng dùng 'nmtui' để kết nối trước."
     exit 1
@@ -29,18 +39,19 @@ jq --arg disk "$TARGET_DISK" \
    --arg pass "$input_pass" \
    '.disk_layouts[0].device = $disk | .users[0].username = $user | .users[0].password = $pass' \
    ilv_config.json > ilv_config_tmp.json
-   
+
+chmod 600 ilv_config_tmp.json
+
 echo "Đang khởi chạy cài đặt trên $TARGET_DISK..."
 set +e
 archinstall --config ilv_config_tmp.json
 INSTALL_STATUS=$?
 set -e
+
 if [ $INSTALL_STATUS -eq 0 ]; then
     echo "Cài đặt thành công."
     touch /etc/ilv_installed
-    rm ilv_config_tmp.json 
 else
     echo "Cài đặt thất bại (Mã: $INSTALL_STATUS)."
-    echo "File cấu hình tạm giữ tại: $(pwd)/ilv_config_tmp.json"
     exit $INSTALL_STATUS
 fi

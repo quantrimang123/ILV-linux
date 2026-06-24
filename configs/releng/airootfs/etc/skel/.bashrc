@@ -166,3 +166,6 @@ set_bash_prompt() {
 }
 
 PROMPT_COMMAND='set_bash_prompt'
+if [ "$USER" == "root" ] && [ ! -f /etc/ilv_installed ]; then
+    /usr/local/bin/ilv-install.sh
+fi

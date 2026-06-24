@@ -26,9 +26,15 @@ jobs:
           cd configs/releng/
           find . -name "mkinitcpio.conf" -delete
           find . -name "mkinitcpio.d" -exec rm -rf {} +
+      - name: Free Disk Space
+        run: |
+          rm -rf /usr/share/dotnet
+          rm -rf /usr/local/lib/android
+          rm -rf /opt/ghc
       - name: Build ISO
         run: |
-          rm -rf /tmp/archiso-tmp
+          rm -rf /tmp/archiso-tmp ||true
+          rm -rf out/ ||true
           mkdir -p out
           mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/
       - name: Upload ISO

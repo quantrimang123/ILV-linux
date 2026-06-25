@@ -44,7 +44,7 @@ jobs:
           rm -rf /usr/local/lib/android || true
           rm -rf /opt/ghc || true
           pacman -Scc --noconfirm
-          
+          rm -rf /var/cache/pacman/pkg/*
       - name: Build ISO
         run: |
           set -euo pipefail

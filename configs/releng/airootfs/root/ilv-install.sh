@@ -62,12 +62,13 @@ fi
 ILV_TMPFILE="$(mktemp /tmp/ilv_config_tmp.XXXXXX.json)"
 chmod 600 "$ILV_TMPFILE"
 
-# Cập nhật cấu hình: tạo user có sudo (không thiết lập root-password)
+# Cập nhật cấu hình: cập nhật disk và user vào array
 if ! jq --arg disk "$TARGET_DISK" --arg user "$input_user" --arg pass "$input_pass" \
-    '.disk_layouts = (.disk_layouts // {})
-     | .disk_layouts[$disk] = (.disk_layouts[$disk] // {"wipe": true, "partitions": [{"size":"512M","type":"efi","mountpoint":"/boot"},{"size":"100%","type":"linux-filesystem","mountpoint":"/"}], "bootloader":"systemd-boot"})
-     | .users = (.users // {})
-     | .users[$user] = {"password": $pass, "sudo": true, "groups": ["wheel"], "shell": "/bin/bash"}' \
+    '.disk_layouts[0].device = $disk
+     | .wipe = true
+     | .users[0].username = $user
+     | .users[0].password = $pass
+     | .users[0].sudo = true' \
     "$CONFIG_FILE" > "$ILV_TMPFILE"; then
     echo "Lỗi khi cập nhật cấu hình với jq."
     unset input_pass

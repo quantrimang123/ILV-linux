@@ -52,9 +52,16 @@ jobs:
           rm -rf /tmp/archiso-tmp || true
           rm -rf out/ || true
           mkdir -p out
-          mount --make-rshared /
-          mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/ || (echo "mkarchiso failed, printing last 200 lines of log" && tail -n 200 /tmp/archiso-tmp/airootfs.log || true; exit 1)
-
+          mount --make-rshared / 
+          
+          df -h
+          free -m
+          
+          mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/ 2>&1 | tee build.log || {
+            echo "--- BUILD FAILED ---"
+            tail -n 200 build.log
+            exit 1
+          }
       - name: AI Auto-Fix (Nếu build lỗi)
         if: failure()
         env:

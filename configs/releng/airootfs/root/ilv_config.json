@@ -27,8 +27,7 @@
   "hostname": "ilvlinux",
   "users": [
     {
-      "username": "USER_PLACEHOLDER",
-      "password": "PASS_PLACEHOLDER",
+      "username": "ilv",
       "sudo": true
     }
   ],

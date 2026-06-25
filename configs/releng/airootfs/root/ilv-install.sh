@@ -40,9 +40,9 @@ while [[ -z "${input_user}" ]]; do
     read -p "Nhập username: " input_user
 done
 
-# Validate username (chỉ chứa chữ cái, số, _, -)
-if ! [[ "$input_user" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "Username chỉ được chứa chữ cái, số, _, -"
+# Validate username (3-32 ký tự, chỉ chứa chữ cái, số, _, -)
+if ! [[ "$input_user" =~ ^[a-zA-Z0-9_-]{3,32}$ ]]; then
+    echo "Username phải từ 3-32 ký tự, chỉ chứa chữ cái, số, _, -"
     unset input_user
     exit 1
 fi
@@ -72,6 +72,26 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     exit 1
 fi
 
+# Validate JSON của CONFIG_FILE
+if ! jq empty "$CONFIG_FILE" 2>/dev/null; then
+    echo "Lỗi: $CONFIG_FILE không hợp lệ!"
+    unset input_pass
+    exit 1
+fi
+
+# Kiểm tra disk_layouts và users arrays không trống
+if ! jq -e '.disk_layouts | length > 0' "$CONFIG_FILE" >/dev/null 2>&1; then
+    echo "Lỗi: disk_layouts array trống hoặc không tồn tại trong config!"
+    unset input_pass
+    exit 1
+fi
+
+if ! jq -e '.users | length > 0' "$CONFIG_FILE" >/dev/null 2>&1; then
+    echo "Lỗi: users array trống hoặc không tồn tại trong config!"
+    unset input_pass
+    exit 1
+fi
+
 # Tạo file tạm an toàn
 ILV_TMPFILE="$(mktemp /tmp/ilv_config_tmp.XXXXXX.json)"
 chmod 600 "$ILV_TMPFILE"
@@ -93,7 +113,6 @@ if [ "$USER_INDEX" == "null" ]; then
 fi
 
 # Cập nhật cấu hình: cập nhật disk và user vào đúng vị trí trong array
-# Sử dụng temp file để truyền password an toàn thay vì command line argument
 if ! jq --arg disk "$TARGET_DISK" \
     --arg user "$input_user" \
     --argjson disk_idx "$DISK_INDEX" \
@@ -134,6 +153,11 @@ if [[ ! -f "$ILV_TMPFILE" ]] || [[ ! -s "$ILV_TMPFILE" ]]; then
     exit 1
 fi
 
+# Lưu backup của config thành công
+CONFIG_BACKUP="/tmp/ilv_config_backup_$(date +%Y%m%d_%H%M%S).json"
+cp "$ILV_TMPFILE" "$CONFIG_BACKUP"
+echo "Backup config: $CONFIG_BACKUP"
+
 echo "Đang khởi chạy cài đặt trên $TARGET_DISK..."
 set +e
 archinstall --config "$ILV_TMPFILE"
@@ -143,7 +167,9 @@ set -e
 if [ $INSTALL_STATUS -eq 0 ]; then
     echo "Cài đặt thành công."
     touch /etc/ilv_installed
+    echo "Log cài đặt: $CONFIG_BACKUP"
 else
     echo "Cài đặt thất bại (Mã: $INSTALL_STATUS)."
+    echo "Để debug, kiểm tra: $CONFIG_BACKUP"
     exit $INSTALL_STATUS
 fi

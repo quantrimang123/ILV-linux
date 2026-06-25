@@ -62,15 +62,30 @@ fi
 ILV_TMPFILE="$(mktemp /tmp/ilv_config_tmp.XXXXXX.json)"
 chmod 600 "$ILV_TMPFILE"
 
-# Cập nhật cấu hình: cập nhật disk và user vào array
+# Tìm index của disk trong config
+DISK_INDEX=$(jq --arg disk "$TARGET_DISK" '.disk_layouts | map(.device == $disk) | index(true)' "$CONFIG_FILE" 2>/dev/null || echo "null")
+
+# Tìm index của user trong config
+USER_INDEX=$(jq --arg user "$input_user" '.users | map(.username == $user) | index(true)' "$CONFIG_FILE" 2>/dev/null || echo "null")
+
+# Nếu disk không tồn tại, sử dụng phần tử đầu tiên
+if [ "$DISK_INDEX" == "null" ]; then
+    DISK_INDEX=0
+fi
+
+# Nếu user không tồn tại, sử dụng phần tử đầu tiên
+if [ "$USER_INDEX" == "null" ]; then
+    USER_INDEX=0
+fi
+
+# Cập nhật cấu hình: cập nhật disk và user vào đúng vị trí trong array
 if ! jq --arg disk "$TARGET_DISK" --arg user "$input_user" --arg pass "$input_pass" \
-    '.disk_layouts[0].device = $disk
-     | .wipe = true
-     | .users[0].username = $user
-     | .users[0].password = $pass
-     | .users[0].sudo = true' \
+    --argjson disk_idx "$DISK_INDEX" --argjson user_idx "$USER_INDEX" \
+    '.disk_layouts[$disk_idx] |= . + {"device": $disk, "wipe": true}
+     | .users[$user_idx] |= . + {"username": $user, "password": $pass, "sudo": true}' \
     "$CONFIG_FILE" > "$ILV_TMPFILE"; then
     echo "Lỗi khi cập nhật cấu hình với jq."
+    rm -f "$ILV_TMPFILE"
     unset input_pass
     exit 1
 fi

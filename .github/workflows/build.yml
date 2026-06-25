@@ -61,8 +61,10 @@ jobs:
           GH_TOKEN: ${{ secrets.ILV_BOT_BUILDER }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+         echo "Hiện đang ở thư mục: $(pwd)"
+          ls -la .git
+          
           set -euo pipefail
-
           git config --global user.name "ILV-Bot"
           git config --global user.email "bot@ilv.linux"
           # Use token for push only; do not expose it in logs.

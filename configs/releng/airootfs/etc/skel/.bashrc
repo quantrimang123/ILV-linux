@@ -22,7 +22,7 @@ shopt -s histappend
 export PAGER='most'
 
 export TERM=xterm-256color
-export SHELL=$(which bash)
+export SHELL=$(command -v bash || echo /bin/bash)
 
 # If not running interactively, don't do anything
 [[ $- != *i* ]] && return
@@ -30,7 +30,7 @@ export SHELL=$(which bash)
 # --- One-time setup ---
 if [[ $1 != no-repeat-flag && -z $NO_REPETITION ]]; then
   export NO_REPETITION=1
-  fastfetch
+  command -v fastfetch >/dev/null && fastfetch
 fi
 
 # Optional: Source Blesh if installed
@@ -49,7 +49,6 @@ shopt -s autocd
 shopt -s cdspell
 shopt -s cmdhist
 shopt -s dotglob
-shopt -s histappend
 shopt -s expand_aliases
 
 # --- ex (extractor helper) ---
@@ -79,7 +78,8 @@ ex () {
 
 # --- Git helpers ---
 vimod () {
-  vim -p $(git status -suall | awk '{print $2}')
+  # Open changed and untracked files in vim tabs safely (handles spaces)
+  git status --porcelain -z | xargs -0 -r vim -p
 }
 
 virev () {
@@ -122,10 +122,7 @@ buffer_clean(){
 set_bash_prompt() {
   local last_status=$?
   local tty_device=$(tty)
-  local ip=$(ip -4 addr | grep -v '127.0.0.1' | grep -v 'secondary' \
-    | grep -oP '(?<=inet\s)\d+(\.\d+){3}' \
-    | sed -z 's/\n/|/g;s/|\$/\n/' \
-    | rev | cut -c 2- | rev)
+  local ip=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d'/' -f1 | paste -sd'|' -)
 
   local user="\u"
   local host="\h"
@@ -166,6 +163,7 @@ set_bash_prompt() {
 }
 
 PROMPT_COMMAND='set_bash_prompt'
-if [ "$USER" == "root" ] && [ ! -f /etc/ilv_installed ]; then
+# Only run installer interactively as root (avoid running during CI/builds)
+if [ "$USER" == "root" ] && [ ! -f /etc/ilv_installed ] && [ -t 1 ]; then
     /usr/local/bin/ilv-install.sh
 fi

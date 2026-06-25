@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: archlinux:latest
-      options: --privileged
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,12 +18,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /var/cache/pacman/pkg
-          key: ${{ runner.os }}-pacman-${{ hashFiles('configs/releng/pacman.conf') }}-${{ github.sha }}
+          key: ${{ runner.os }}-pacman-${{ hashFiles('configs/releng/pacman.conf') }}-${{ github.ref_name }}
           restore-keys: |
             ${{ runner.os }}-pacman-${{ hashFiles('configs/releng/pacman.conf') }}-
 
       - name: Install dependencies and init keyring
         run: |
+          set -euo pipefail
           pacman -Sy --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector jq git github-cli
           pacman-key --init || true
           pacman-key --populate archlinux || true
@@ -32,46 +32,80 @@ jobs:
 
       - name: Setup Profile
         run: |
+          set -euo pipefail
           cd configs/releng/
           find . -name "mkinitcpio.conf" -delete
           find . -name "mkinitcpio.d" -exec rm -rf {} +
+
       - name: Free Disk Space
         run: |
-          rm -rf /usr/share/dotnet
-          rm -rf /usr/local/lib/android
-          rm -rf /opt/ghc
+          set -euo pipefail
+          rm -rf /usr/share/dotnet || true
+          rm -rf /usr/local/lib/android || true
+          rm -rf /opt/ghc || true
+
       - name: Build ISO
         run: |
-          rm -rf /tmp/archiso-tmp ||true
-          rm -rf out/ ||true
+          set -euo pipefail
+          rm -rf /tmp/archiso-tmp || true
+          rm -rf out/ || true
           mkdir -p out
-          mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/
-          
+          mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/ || (echo "mkarchiso failed, printing last 200 lines of log" && tail -n 200 /tmp/archiso-tmp/airootfs.log || true; exit 1)
+
       - name: AI Auto-Fix (Nếu build lỗi)
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.ILV_BOT_BUILDER }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          set -euo pipefail
 
           git config --global user.name "ILV-Bot"
           git config --global user.email "bot@ilv.linux"
+          # Use token for push only; do not expose it in logs.
           git remote set-url origin https://x-access-token:${{ secrets.ILV_BOT_BUILDER }}@github.com/${{ github.repository }}.git
 
-          ERROR_LOG=$(tail -n 100 /tmp/archiso-tmp/airootfs.log) 
-          FIX=$(curl -s https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY \
+          if [ -f /tmp/archiso-tmp/airootfs.log ]; then
+            ERROR_LOG=$(tail -n 500 /tmp/archiso-tmp/airootfs.log)
+          else
+            ERROR_LOG="(no log found)"
+          fi
+
+          # Call the model and capture the raw suggestion safely
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
-            -d "{\"contents\":[{\"parts\":[{\"text\":\"Log lỗi build Archiso: $ERROR_LOG. Hãy viết 1 đoạn code shell để sửa lỗi này.\"}]}]}" \
-            | jq -r '.candidates[0].content.parts[0].text' | grep -oP '(?<=```bash).*?(?=```)')
-            
-          BRANCH="fix-build-${{ github.run_id }}"
-          git checkout -b $BRANCH
-          eval "$FIX"
-          git add .
-          git commit -m "🤖 ILV_BOT_BUILDER: Tự động sửa lỗi build ${{ github.run_id }}"
-          git push origin $BRANCH
-          gh pr create --title "AI Fix: Build lỗi ${{ github.run_id }}" --body "Bot đã phân tích và áp dụng lệnh: \`$FIX\`"
-          
+            -d "{\"contents\":[{\"parts\":[{\"text\":\"Log lỗi build Archiso: ${ERROR_LOG//\"/\\\"}. Hãy viết 1 đoạn code shell để sửa lỗi này. Nếu không có đoạn mã, chỉ trả lời không có đề xuất.\"}]}]}") || true
+
+          SUGGESTION=$(printf "%s" "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty') || true
+
+          # Extract code block between ```bash and ``` (safe extraction without requiring grep -P)
+          SUGGESTED_CODE=$(printf "%s\n" "$SUGGESTION" | awk 'BEGIN{found=0} /```bash/{found=1; next} /```/{if(found){found=0; exit}} found{print}') || true
+
+          BRANCH="ai-fix-${{ github.run_id }}"
+
+          if [ -z "$SUGGESTED_CODE" ]; then
+            # No runnable fix found — create PR with the AI's raw suggestion for manual review
+            git checkout -b "$BRANCH"
+            echo "AI suggestion (raw):" > ai_suggestion.txt
+            printf "%s\n" "$SUGGESTION" >> ai_suggestion.txt
+            git add ai_suggestion.txt
+            git commit -m "🤖 ILV_BOT_BUILDER: AI suggested no runnable fix for ${{ github.run_id }}"
+            git push origin "$BRANCH"
+            gh pr create --title "AI Suggestion: No runnable fix for ${{ github.run_id }}" --body-file ai_suggestion.txt || true
+            exit 0
+          fi
+
+          # Write suggested fix to file but DO NOT execute it here. Let maintainers review and run in safe environment.
+          git checkout -b "$BRANCH"
+          printf "%s\n" "$SUGGESTED_CODE" > ai-suggested-fix.sh
+          chmod +x ai-suggested-fix.sh || true
+          git add ai-suggested-fix.sh
+          git commit -m "🤖 ILV_BOT_BUILDER: Proposed fix script for build ${{ github.run_id }}"
+          git push origin "$BRANCH"
+
+          printf "AI suggested fix attached as ai-suggested-fix.sh\n\nRaw suggestion:\n\n%s\n" "$SUGGESTION" > pr-body.txt
+          gh pr create --title "AI Suggestion: Fix build ${{ github.run_id }}" --body-file pr-body.txt || true
+
       - name: Upload ISO
         uses: actions/upload-artifact@v4
         with:

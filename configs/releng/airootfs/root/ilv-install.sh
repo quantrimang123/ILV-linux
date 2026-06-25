@@ -40,6 +40,13 @@ while [[ -z "${input_user}" ]]; do
     read -p "Nhập username: " input_user
 done
 
+# Validate username (chỉ chứa chữ cái, số, _, -)
+if ! [[ "$input_user" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "Username chỉ được chứa chữ cái, số, _, -"
+    unset input_user
+    exit 1
+fi
+
 read -s -p "Nhập mật khẩu: " input_pass
 echo ""
 while [[ -z "${input_pass}" ]]; do
@@ -47,6 +54,13 @@ while [[ -z "${input_pass}" ]]; do
     read -s -p "Nhập mật khẩu: " input_pass
     echo ""
 done
+
+# Validate mật khẩu (tối thiểu 8 ký tự)
+if [[ ${#input_pass} -lt 8 ]]; then
+    echo "Mật khẩu phải có tối thiểu 8 ký tự."
+    unset input_pass
+    exit 1
+fi
 
 # Tìm file cấu hình (giả sử cùng thư mục với script)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,10 +93,15 @@ if [ "$USER_INDEX" == "null" ]; then
 fi
 
 # Cập nhật cấu hình: cập nhật disk và user vào đúng vị trí trong array
-if ! jq --arg disk "$TARGET_DISK" --arg user "$input_user" --arg pass "$input_pass" \
-    --argjson disk_idx "$DISK_INDEX" --argjson user_idx "$USER_INDEX" \
-    '.disk_layouts[$disk_idx] |= . + {"device": $disk, "wipe": true}
-     | .users[$user_idx] |= . + {"username": $user, "password": $pass, "sudo": true}' \
+# Sử dụng temp file để truyền password an toàn thay vì command line argument
+if ! jq --arg disk "$TARGET_DISK" \
+    --arg user "$input_user" \
+    --argjson disk_idx "$DISK_INDEX" \
+    --argjson user_idx "$USER_INDEX" \
+    ".disk_layouts[\$disk_idx].device = \$disk
+     | .disk_layouts[\$disk_idx].wipe = true
+     | .users[\$user_idx].username = \$user
+     | .users[\$user_idx].sudo = true" \
     "$CONFIG_FILE" > "$ILV_TMPFILE"; then
     echo "Lỗi khi cập nhật cấu hình với jq."
     rm -f "$ILV_TMPFILE"
@@ -90,8 +109,30 @@ if ! jq --arg disk "$TARGET_DISK" --arg user "$input_user" --arg pass "$input_pa
     exit 1
 fi
 
+# Cập nhật mật khẩu vào file tạm (tránh truyền qua command line)
+if ! jq --arg pass "$input_pass" '.users['"$USER_INDEX"'].password = $pass' "$ILV_TMPFILE" > "${ILV_TMPFILE}.tmp"; then
+    echo "Lỗi khi cập nhật mật khẩu."
+    rm -f "$ILV_TMPFILE" "${ILV_TMPFILE}.tmp"
+    unset input_pass
+    exit 1
+fi
+mv "${ILV_TMPFILE}.tmp" "$ILV_TMPFILE"
+
 # Xóa biến chứa mật khẩu trong shell
 unset input_pass
+
+# Validate JSON output trước khi chạy archinstall
+if ! jq empty "$ILV_TMPFILE" 2>/dev/null; then
+    echo "Lỗi: File config không hợp lệ!"
+    rm -f "$ILV_TMPFILE"
+    exit 1
+fi
+
+# Kiểm tra file tạm có tồn tại
+if [[ ! -f "$ILV_TMPFILE" ]] || [[ ! -s "$ILV_TMPFILE" ]]; then
+    echo "Lỗi: File config tạm không được tạo hoặc trống!"
+    exit 1
+fi
 
 echo "Đang khởi chạy cài đặt trên $TARGET_DISK..."
 set +e

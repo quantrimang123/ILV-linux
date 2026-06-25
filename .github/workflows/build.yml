@@ -15,12 +15,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-pacman-${{ hashFiles('configs/releng/pacman.conf') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-pacman-${{ hashFiles('configs/releng/pacman.conf') }}-
+
+      - name: Install dependencies and init keyring
         run: |
-          pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm archiso squashfs-tools dosfstools mtools base-devel reflector
+          pacman -Syu --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector
+          pacman-key --init || true
+          pacman-key --populate archlinux || true
           reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
-          pacman -Syu --noconfirm
+
       - name: Setup Profile
         run: |
           cd configs/releng/

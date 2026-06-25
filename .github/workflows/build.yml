@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies and init keyring
         run: |
-          pacman -Syu --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector
+          pacman -Sy --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector jq git github-cli
           pacman-key --init || true
           pacman-key --populate archlinux || true
           reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
@@ -46,6 +46,32 @@ jobs:
           rm -rf out/ ||true
           mkdir -p out
           mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/
+          
+      - name: AI Auto-Fix (Nếu build lỗi)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.ILV_BOT_BUILDER }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+
+          git config --global user.name "ILV-Bot"
+          git config --global user.email "bot@ilv.linux"
+          git remote set-url origin https://x-access-token:${{ secrets.ILV_BOT_BUILDER }}@github.com/${{ github.repository }}.git
+
+          ERROR_LOG=$(tail -n 100 /tmp/archiso-tmp/airootfs.log) 
+          FIX=$(curl -s https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY \
+            -H 'Content-Type: application/json' \
+            -d "{\"contents\":[{\"parts\":[{\"text\":\"Log lỗi build Archiso: $ERROR_LOG. Hãy viết 1 đoạn code shell để sửa lỗi này.\"}]}]}" \
+            | jq -r '.candidates[0].content.parts[0].text' | grep -oP '(?<=```bash).*?(?=```)')
+            
+          BRANCH="fix-build-${{ github.run_id }}"
+          git checkout -b $BRANCH
+          eval "$FIX"
+          git add .
+          git commit -m "🤖 ILV_BOT_BUILDER: Tự động sửa lỗi build ${{ github.run_id }}"
+          git push origin $BRANCH
+          gh pr create --title "AI Fix: Build lỗi ${{ github.run_id }}" --body "Bot đã phân tích và áp dụng lệnh: \`$FIX\`"
+          
       - name: Upload ISO
         uses: actions/upload-artifact@v4
         with:

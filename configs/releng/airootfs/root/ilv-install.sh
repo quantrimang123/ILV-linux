@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Đã sửa: Xóa CONFIG_BACKUP khỏi trap để giữ lại file khi cài đặt thất bại phục vụ debug
 cleanup() {
     [[ -n "${ILV_TMPFILE:-}" ]] && rm -f -- "$ILV_TMPFILE"
-    [[ -n "${CONFIG_BACKUP:-}" ]] && [[ -f "$CONFIG_BACKUP" ]] && rm -f -- "$CONFIG_BACKUP"
 }
 trap cleanup EXIT
 
@@ -20,7 +20,8 @@ if [[ ! -w /tmp ]]; then
     exit 1
 fi
 
-TMP_SPACE=$(df /tmp | awk 'NR==2 {print $4}')
+# Đã sửa: Dùng cách lấy dung lượng trống an toàn hơn
+TMP_SPACE=$(df --output=avail /tmp | tail -n 1 | tr -d ' ')
 if [[ $TMP_SPACE -lt 102400 ]]; then
     echo "Lỗi: /tmp không có đủ không gian (cần ít nhất 100MB)!"
     exit 1
@@ -55,33 +56,31 @@ if [[ ! -w "$TARGET_DISK" ]]; then
 fi
 
 echo "Đã phát hiện ổ đĩa mục tiêu: $TARGET_DISK"
-read -p "Nhập username: " input_user
-while [[ -z "${input_user}" ]]; do
-    echo "Username không được để trống."
+
+# Đã sửa: Sử dụng vòng lặp để người dùng nhập lại nếu sai định dạng thay vì thoát script
+while true; do
     read -p "Nhập username: " input_user
+    if [[ -z "${input_user}" ]]; then
+        echo "Username không được để trống."
+    elif ! [[ "$input_user" =~ ^[a-zA-Z_][a-zA-Z0-9_-]{2,31}$ ]]; then
+        echo "Username phải từ 3-32 ký tự, bắt đầu bằng chữ cái hoặc _, chỉ chứa chữ cái, số, _, -"
+    else
+        break
+    fi
 done
 
-# Validate username (bắt đầu bằng chữ cái hoặc _, 3-32 ký tự)
-if ! [[ "$input_user" =~ ^[a-zA-Z_][a-zA-Z0-9_-]{2,31}$ ]]; then
-    echo "Username phải từ 3-32 ký tự, bắt đầu bằng chữ cái hoặc _, chỉ chứa chữ cái, số, _, -"
-    unset input_user
-    exit 1
-fi
-
-read -s -p "Nhập mật khẩu: " input_pass
-echo ""
-while [[ -z "${input_pass}" ]]; do
-    echo "Mật khẩu không được để trống."
+# Đã sửa: Tương tự, dùng vòng lặp để nhập mật khẩu
+while true; do
     read -s -p "Nhập mật khẩu: " input_pass
     echo ""
+    if [[ -z "${input_pass}" ]]; then
+        echo "Mật khẩu không được để trống."
+    elif [[ ${#input_pass} -lt 8 ]]; then
+        echo "Mật khẩu phải có tối thiểu 8 ký tự."
+    else
+        break
+    fi
 done
-
-# Validate mật khẩu (tối thiểu 8 ký tự)
-if [[ ${#input_pass} -lt 8 ]]; then
-    echo "Mật khẩu phải có tối thiểu 8 ký tự."
-    unset input_pass
-    exit 1
-fi
 
 # Tìm file cấu hình (giả sử cùng thư mục với script)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

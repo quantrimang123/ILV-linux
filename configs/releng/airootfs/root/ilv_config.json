@@ -7,6 +7,7 @@
     {
       "device": "/dev/nvme0n1",
       "config_type": "partition",
+      "wipe": true,
       "partitions": [
         {
           "mountpoint": "/boot/efi",
@@ -21,14 +22,16 @@
       ]
     }
   ],
-  "wipe": true,
   "bootloader": "grub",
   "swap": true,
   "hostname": "ilvlinux",
   "users": [
     {
       "username": "ilv",
-      "sudo": true
+      "password": "",
+      "sudo": true,
+      "groups": ["wheel"],
+      "shell": "/bin/bash"
     }
   ],
   "additional-packages": [

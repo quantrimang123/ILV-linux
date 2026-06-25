@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: archlinux:latest
+      options: --privileged --device=/dev/loop-control --device=/dev/loop0 --cap-add=SYS_ADMIN --cap-add=SYS_CHROOT
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,6 +52,7 @@ jobs:
           rm -rf /tmp/archiso-tmp || true
           rm -rf out/ || true
           mkdir -p out
+          mount --make-rshared /
           mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/ || (echo "mkarchiso failed, printing last 200 lines of log" && tail -n 200 /tmp/archiso-tmp/airootfs.log || true; exit 1)
 
       - name: AI Auto-Fix (Nếu build lỗi)

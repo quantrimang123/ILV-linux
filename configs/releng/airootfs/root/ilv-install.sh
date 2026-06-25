@@ -3,6 +3,7 @@ set -euo pipefail
 
 cleanup() {
     [[ -n "${ILV_TMPFILE:-}" ]] && rm -f -- "$ILV_TMPFILE"
+    [[ -n "${CONFIG_BACKUP:-}" ]] && [[ -f "$CONFIG_BACKUP" ]] && rm -f -- "$CONFIG_BACKUP"
 }
 trap cleanup EXIT
 
@@ -13,8 +14,22 @@ for cmd in jq archinstall reflector ping; do
     command -v "$cmd" >/dev/null 2>&1 || { echo "$cmd không được cài đặt"; exit 1; }
 done
 
+# Kiểm tra /tmp writable và có không gian
+if [[ ! -w /tmp ]]; then
+    echo "Lỗi: /tmp không có quyền ghi!"
+    exit 1
+fi
+
+TMP_SPACE=$(df /tmp | awk 'NR==2 {print $4}')
+if [[ $TMP_SPACE -lt 102400 ]]; then
+    echo "Lỗi: /tmp không có đủ không gian (cần ít nhất 100MB)!"
+    exit 1
+fi
+
 echo "Đang tối ưu hóa tốc độ tải..."
-reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
+if ! reflector --latest 5 --sort rate --save /etc/pacman.d/mirrorlist 2>/dev/null; then
+    echo "Cảnh báo: reflector thất bại, tiếp tục với mirror mặc định..."
+fi
 
 if ! ping -c 1 archlinux.org >/dev/null 2>&1; then
     echo "Không có internet! Vui lòng dùng 'nmtui' để kết nối trước."
@@ -33,6 +48,12 @@ else
     exit 1
 fi
 
+# Validate disk writable
+if [[ ! -w "$TARGET_DISK" ]]; then
+    echo "Lỗi: Không có quyền ghi trên $TARGET_DISK!"
+    exit 1
+fi
+
 echo "Đã phát hiện ổ đĩa mục tiêu: $TARGET_DISK"
 read -p "Nhập username: " input_user
 while [[ -z "${input_user}" ]]; do
@@ -40,9 +61,9 @@ while [[ -z "${input_user}" ]]; do
     read -p "Nhập username: " input_user
 done
 
-# Validate username (3-32 ký tự, chỉ chứa chữ cái, số, _, -)
-if ! [[ "$input_user" =~ ^[a-zA-Z0-9_-]{3,32}$ ]]; then
-    echo "Username phải từ 3-32 ký tự, chỉ chứa chữ cái, số, _, -"
+# Validate username (bắt đầu bằng chữ cái hoặc _, 3-32 ký tự)
+if ! [[ "$input_user" =~ ^[a-zA-Z_][a-zA-Z0-9_-]{2,31}$ ]]; then
+    echo "Username phải từ 3-32 ký tự, bắt đầu bằng chữ cái hoặc _, chỉ chứa chữ cái, số, _, -"
     unset input_user
     exit 1
 fi
@@ -153,9 +174,10 @@ if [[ ! -f "$ILV_TMPFILE" ]] || [[ ! -s "$ILV_TMPFILE" ]]; then
     exit 1
 fi
 
-# Lưu backup của config thành công
+# Lưu backup của config với permissions an toàn
 CONFIG_BACKUP="/tmp/ilv_config_backup_$(date +%Y%m%d_%H%M%S).json"
 cp "$ILV_TMPFILE" "$CONFIG_BACKUP"
+chmod 600 "$CONFIG_BACKUP"
 echo "Backup config: $CONFIG_BACKUP"
 
 echo "Đang khởi chạy cài đặt trên $TARGET_DISK..."
@@ -167,7 +189,9 @@ set -e
 if [ $INSTALL_STATUS -eq 0 ]; then
     echo "Cài đặt thành công."
     touch /etc/ilv_installed
-    echo "Log cài đặt: $CONFIG_BACKUP"
+    # Xóa backup file sau cài đặt thành công (vì chứa mật khẩu plaintext)
+    rm -f "$CONFIG_BACKUP"
+    echo "Backup config đã xóa (chứa mật khẩu)."
 else
     echo "Cài đặt thất bại (Mã: $INSTALL_STATUS)."
     echo "Để debug, kiểm tra: $CONFIG_BACKUP"

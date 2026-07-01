@@ -33,9 +33,10 @@ jobs:
       - name: Setup and Build
         run: |
           mkdir -p buildroot
+          echo "Downloading Buildroot..."
           curl -O https://buildroot.org/downloads/buildroot-2026.02.tar.gz
           tar -xf buildroot-2026.02.tar.gz -C buildroot --strip-components=1
-          cp configs/ilvdistro_defconfig buildroot/
+          cp buildroot_configs/ilvdistro_defconfig buildroot/configs/
           cd buildroot
           mv ilvdistro_defconfig configs/
           make ilvdistro_defconfig

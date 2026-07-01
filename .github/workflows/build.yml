@@ -26,11 +26,21 @@ jobs:
       - name: Install dependencies and init keyring
         run: |
           set -euo pipefail
-          pacman -Sy --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector jq git github-cli
+          pacman -Sy --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector jq git github-cli curl
           pacman-key --init || true
           pacman-key --populate archlinux || true
           reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
-
+      - name: Setup Buildroot
+        run: |
+          pwd
+          mkdir -p buildroot
+          cd buildroot
+          curl -O https://buildroot.org/downloads/buildroot-2026.02.tar.gz
+          tar -xf buildroot-2026.02.tar.gz --strip-components=1
+          cp configs/ilvdistro_defconfig .config
+          make olddefconfig
+          make -j$(nproc)
+          cd ..
       - name: Setup Profile
         run: |
           set -euo pipefail
@@ -53,15 +63,7 @@ jobs:
           rm -rf out/ || true
           mkdir -p out
           mount --make-rshared / 
-          
-          df -h
-          free -m
-          
-          mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/ 2>&1 | tee build.log || {
-            echo "--- BUILD FAILED ---"
-            tail -n 200 build.log
-            exit 1
-          }
+      
       - name: AI Auto-Fix (Nếu build lỗi)
         if: failure()
         env:

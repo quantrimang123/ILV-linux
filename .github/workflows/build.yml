@@ -30,17 +30,17 @@ jobs:
           pacman-key --init || true
           pacman-key --populate archlinux || true
           reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
-      - name: Setup Buildroot
+      - name: Setup and Build
         run: |
-          pwd
           mkdir -p buildroot
-          cd buildroot
           curl -O https://buildroot.org/downloads/buildroot-2026.02.tar.gz
-          tar -xf buildroot-2026.02.tar.gz --strip-components=1
-          cp configs/ilvdistro_defconfig .config
+          tar -xf buildroot-2026.02.tar.gz -C buildroot --strip-components=1
+          cp configs/ilvdistro_defconfig buildroot/
+          cd buildroot
+          mv ilvdistro_defconfig configs/
+          make ilvdistro_defconfig
           make olddefconfig
           make -j$(nproc)
-          cd ..
       - name: Setup Profile
         run: |
           set -euo pipefail

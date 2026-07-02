@@ -27,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           pacman -Sy --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector jq git github-cli curl bc wget unzip rsync
+          pacman -S --noconfirm ncurses libelf perl texinfo glibc
           pacman-key --init || true
           pacman-key --populate archlinux || true
           reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist

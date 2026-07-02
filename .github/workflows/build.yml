@@ -54,9 +54,14 @@ jobs:
       - name: Verify Build Output And Copy
         run: |
           find buildroot/output/ -name rootfs.tar
-          DEST_DIR="$GITHUB_WORKSPACE/configs/releng/airootfs/opt/ilvdistro"
-          mkdir -p "$DEST_DIR"
-          cp "$GITHUB_WORKSPACE/buildroot/output/images/rootfs.tar" "$DEST_DIR/"
+          
+          set -x
+          SRC="$GITHUB_WORKSPACE/buildroot/output/images/rootfs.tar"
+          DST_DIR="$GITHUB_WORKSPACE/configs/releng/airootfs/opt/ilvdistro"
+          echo "Source exists: $(ls -l $SRC)"
+          echo "Destination parent dir: $(ls -ld $GITHUB_WORKSPACE/configs/releng/airootfs/opt/)"
+          mkdir -p "$DST_DIR"
+          cp -v "$SRC" "$DST_DIR/"
       - name: Setup Profile
         run: |
           set -euo pipefail

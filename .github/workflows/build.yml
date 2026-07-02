@@ -1,18 +1,13 @@
 name: Build Minimal Arch ISO (Baseline + Bootstrap)
-
-on:
-push:
-branches: ["main"]
-workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
-build:
-runs-on: ubuntu-latest
-timeout-minutes: 90
-container:
-  image: archlinux:latest
-  options: --cap-add=SYS_ADMIN --cap-add=SYS_CHROOT --device=/dev/loop-control --device=/dev/loop0
-
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --cap-add=SYS_ADMIN --cap-add=SYS_CHROOT --device=/dev/loop-control --device=/dev/loop0
+    timeout-minutes: 333
 steps:
   - name: Checkout
     uses: actions/checkout@v4

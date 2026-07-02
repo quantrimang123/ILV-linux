@@ -39,29 +39,14 @@ jobs:
           echo "/opt/gcc-13/bin" >> $GITHUB_PATH
           export PATH="/opt/gcc-13/bin:$PATH"
           cd ..
-      - name: Setup and Build
+          curl -O https://archive.archlinux.org/iso/2026.07.01/archlinux-bootstrap-2026.07.01-x86_64.tar.zst
+          tar -I zstd -xvf archlinux-bootstrap-*.tar.zst
+      - name: Build Rootfs
         run: |
-          mkdir -p buildroot
-          echo "Downloading Buildroot..."
-          curl -O https://buildroot.org/downloads/buildroot-2026.02.tar.gz
-          tar -xf buildroot-2026.02.tar.gz -C buildroot --strip-components=1
-          cp buildroot_configs/ilvdistro_defconfig buildroot/configs/
-          cd buildroot
-          make clean
-          make ilvdistro_defconfig
-          make olddefconfig
-          make -j$(nproc)
+          bash scripts/bootstrap.sh
+          tar --numeric-owner --xattrs --acls -I 'zstd -19' -cf arch-hammer.tar.zst -C root.x86_64 .
       - name: Verify Build Output And Copy
         run: |
-          find buildroot/output/ -name rootfs.tar
-          
-          set -x
-          SRC="$GITHUB_WORKSPACE/buildroot/output/images/rootfs.tar"
-          DST_DIR="$GITHUB_WORKSPACE/configs/releng/airootfs/opt/ilvdistro"
-          echo "Source exists: $(ls -l $SRC)"
-          echo "Destination parent dir: $(ls -ld $GITHUB_WORKSPACE/configs/releng/airootfs/opt/)"
-          mkdir -p "$DST_DIR"
-          cp -v "$SRC" "$DST_DIR/"
       - name: Setup Profile
         run: |
           set -euo pipefail

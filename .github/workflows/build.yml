@@ -31,6 +31,11 @@ jobs:
           pacman-key --init || true
           pacman-key --populate archlinux || true
           reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+          mkdir -p /opt/gcc-13
+          curl -L https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.08-1.tar.bz2 | tar -xjC /opt/gcc-13 --strip-components=1
+          echo "/opt/gcc-13/bin" >> $GITHUB_PATH
+          export PATH="/opt/gcc-13/bin:$PATH"
+          cd ..
       - name: Setup and Build
         run: |
           mkdir -p buildroot
@@ -39,6 +44,7 @@ jobs:
           tar -xf buildroot-2026.02.tar.gz -C buildroot --strip-components=1
           cp buildroot_configs/ilvdistro_defconfig buildroot/configs/
           cd buildroot
+          make clean
           make ilvdistro_defconfig
           make olddefconfig
           make -j$(nproc)

@@ -38,13 +38,14 @@ jobs:
           curl -L https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.08-1.tar.bz2 | tar -xjC /opt/gcc-13 --strip-components=1
           echo "/opt/gcc-13/bin" >> $GITHUB_PATH
           export PATH="/opt/gcc-13/bin:$PATH"
-          cd ..
           curl -O https://archive.archlinux.org/iso/2026.07.01/archlinux-bootstrap-2026.07.01-x86_64.tar.zst
           tar -I zstd -xvf archlinux-bootstrap-*.tar.zst
       - name: Build Rootfs
         run: |
+          ls -la bootstrap.sh
+          chmod +x bootstrap.sh
           pacman -S --noconfirm zstd
-          bash scripts/bootstrap.sh
+          bash bootstrap.sh
           tar --numeric-owner --xattrs --acls -I 'zstd -19' \--exclude='./proc/*' --exclude='./sys/*' --exclude='./dev/*' \-cf ILVLinux.tar.zst -C root.x86_64 .
       - name: Verify Build Output And Copy
         run: |

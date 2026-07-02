@@ -54,6 +54,9 @@ jobs:
           cd ..
           mkdir -p configs/releng/airootfs/opt/ilvdistro/
           cp buildroot/output/images/rootfs.tar configs/releng/airootfs/opt/ilvdistro/
+      - name: Verify Build Output
+        run: |
+          find buildroot/output/ -name rootfs.tar
       - name: Setup Profile
         run: |
           set -euo pipefail

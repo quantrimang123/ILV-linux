@@ -84,6 +84,10 @@ jobs:
           rm -rf out/ || true
           mkdir -p out
           mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/
+      - name: Verify Rootfs and ISO structure
+        run: |
+          echo "--- Kiểm tra thư mục output ---"
+          ls -lh out/
       - name: AI Auto-Fix (Nếu build lỗi)
         if: failure()
         env:

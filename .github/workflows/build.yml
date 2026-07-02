@@ -1,0 +1,123 @@
+name: Build Minimal Arch ISO (Baseline + Bootstrap)
+
+on:
+push:
+branches: ["main"]
+workflow_dispatch:
+
+jobs:
+build:
+runs-on: ubuntu-latest
+timeout-minutes: 90
+container:
+  image: archlinux:latest
+  options: --cap-add=SYS_ADMIN --cap-add=SYS_CHROOT --device=/dev/loop-control --device=/dev/loop0
+
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
+
+  - name: Setup pacman + keyring
+    run: |
+      set -euo pipefail
+      pacman -Sy --noconfirm archlinux-keyring
+      pacman-key --init
+      pacman-key --populate archlinux
+      pacman -Syu --noconfirm
+
+  - name: Install dependencies
+    run: |
+      set -euo pipefail
+      pacman -S --noconfirm \
+        archiso \
+        squashfs-tools \
+        dosfstools \
+        mtools \
+        curl \
+        jq \
+        git \
+        rsync \
+        zstd
+
+  - name: Cache pacman packages
+    uses: actions/cache@v4
+    with:
+      path: /var/cache/pacman/pkg
+      key: ${{ runner.os }}-pacman-${{ hashFiles('configs/packages.x86_64') }}
+      restore-keys: |
+        ${{ runner.os }}-pacman-
+
+  - name: Prepare baseline profile
+    run: |
+      set -euo pipefail
+      cp -r /usr/share/archiso/configs/baseline ./iso
+      mkdir -p iso/airootfs
+
+  - name: Bootstrap minimal rootfs
+    run: |
+      set -euo pipefail
+
+      ROOTFS=root.x86_64
+      mkdir -p $ROOTFS
+
+      pacstrap -c -G -M $ROOTFS \
+        base linux systemd bash coreutils
+
+      # Clean cache
+      rm -rf $ROOTFS/var/cache/pacman/pkg/*
+
+  - name: Configure rootfs (minimal usable)
+    run: |
+      set -euo pipefail
+
+      ROOTFS=root.x86_64
+
+      echo "ilv-linux" > $ROOTFS/etc/hostname
+
+      # enable getty
+      ln -sf /usr/lib/systemd/system/getty@.service \
+        $ROOTFS/etc/systemd/system/getty.target.wants/getty@tty1.service
+
+      # minimal network
+      arch-chroot $ROOTFS pacman -S --noconfirm iproute2 dhcpcd
+      arch-chroot $ROOTFS systemctl enable dhcpcd
+
+      # locale
+      echo "en_US.UTF-8 UTF-8" > $ROOTFS/etc/locale.gen
+      arch-chroot $ROOTFS locale-gen
+
+      # root password (optional)
+      echo "root:root" | arch-chroot $ROOTFS chpasswd
+
+      # remove bloat
+      rm -rf $ROOTFS/usr/share/{doc,man,info,locale}/*
+
+  - name: Pack rootfs into archiso
+    run: |
+      set -euo pipefail
+
+      rsync -a root.x86_64/ iso/airootfs/
+
+  - name: Free disk space
+    run: |
+      set -euo pipefail
+      pacman -Scc --noconfirm || true
+      rm -rf /var/cache/pacman/pkg/*
+
+  - name: Build ISO
+    run: |
+      set -euo pipefail
+      mkdir -p out
+      mkarchiso -v -w /tmp/archiso-tmp -o out iso/
+
+  - name: Verify output
+    run: |
+      ls -lh out/
+
+  - name: Upload ISO
+    uses: actions/upload-artifact@v4
+    with:
+      name: minimal-arch-iso
+      path: out/*.iso
+      retention-days: 7
+```

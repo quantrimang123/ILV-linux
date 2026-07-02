@@ -16,7 +16,7 @@ jobs:
         --device=/dev/loop-control
         --device=/dev/loop0
         --volume /dev:/dev
-        --volume /proc:/proc
+        --volume /proc:/proc:rslave
     steps:
       - name: Checkout
         uses: actions/checkout@v4

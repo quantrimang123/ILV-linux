@@ -44,6 +44,7 @@ jobs:
       - name: Build Rootfs
         run: |
           bash scripts/bootstrap.sh
+          tar --numeric-owner --xattrs --acls -I 'zstd -19' -cf arch-hammer.tar.zst -C root.x86_64 .
       - name: Upload ISO
         uses: actions/upload-artifact@v4
         with:

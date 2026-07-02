@@ -39,3 +39,13 @@ jobs:
           echo "/opt/gcc-13/bin" >> $GITHUB_PATH
           export PATH="/opt/gcc-13/bin:$PATH"
           cd ..
+          curl -O https://archive.archlinux.org/iso/2026.07.01/archlinux-bootstrap-2026.07.01-x86_64.tar.zst
+          tar -I zstd -xvf archlinux-bootstrap-*.tar.zst
+      - name: Build Rootfs
+        run: |
+          bash scripts/bootstrap.sh
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: ILV-Linux-ISO
+          path: /out/*.iso

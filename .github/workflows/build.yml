@@ -115,4 +115,3 @@ steps:
       name: minimal-arch-iso
       path: out/*.iso
       retention-days: 7
-```

@@ -43,10 +43,12 @@ jobs:
           tar -I zstd -xvf archlinux-bootstrap-*.tar.zst
       - name: Build Rootfs
         run: |
+          pacman -S --noconfirm zstd
           bash scripts/bootstrap.sh
-          tar --numeric-owner --xattrs --acls -I 'zstd -19' -cf arch-hammer.tar.zst -C root.x86_64 .
+          tar --numeric-owner --xattrs --acls -I 'zstd -19' \--exclude='./proc/*' --exclude='./sys/*' --exclude='./dev/*' \-cf ILVLinux.tar.zst -C root.x86_64 .
       - name: Verify Build Output And Copy
         run: |
+          tar --numeric-owner --xattrs --acls -xf ILVLinux.tar.zst -C configs/releng/airootfs
       - name: Setup Profile
         run: |
           set -euo pipefail

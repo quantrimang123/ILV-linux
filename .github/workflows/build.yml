@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies and init keyring
         run: |
           set -euo pipefail
-          pacman -Sy --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector jq git github-cli curl bc 
+          pacman -Sy --noconfirm archlinux-keyring aria2 archiso squashfs-tools dosfstools mtools base-devel reflector jq git github-cli curl bc wget unzip rsync
           pacman-key --init || true
           pacman-key --populate archlinux || true
           reflector --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist

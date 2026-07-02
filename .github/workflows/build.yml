@@ -83,7 +83,7 @@ jobs:
           rm -rf /tmp/archiso-tmp || true
           rm -rf out/ || true
           mkdir -p out
-          mount --make-rshared / 
+          mkarchiso -v -w /tmp/archiso-tmp -o out/ configs/releng/
       
       - name: AI Auto-Fix (Nếu build lỗi)
         if: failure()

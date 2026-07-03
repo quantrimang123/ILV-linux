@@ -35,6 +35,8 @@ jobs:
           cp -r my_config_folder/configs/baseline .
       - name: Set current date as environment variable
         run: echo "DATE=$(date +'%Y.%m.%d')" >> "$GITHUB_ENV" 
+      - name: Install required packages
+        run: pacman -Sy grub --noconfirm
       - name: Run build-iso script
         run: bash build-iso
       - name: Upload artifact

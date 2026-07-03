@@ -26,7 +26,11 @@ jobs:
 
       - name: Set current date as environment variable
         run: echo "DATE=$(date +'%Y.%m.%d')" >> "$GITHUB_ENV"
-
+      - name: Install Git and Clone Custom Profile
+        run: |
+          pacman -Syu --noconfirm git
+          rm -rf my-profile ||true
+          git clone https://github.com/quantrimang123/ILV-linux/tree/master/configs/baseline
       - name: Run build-iso script
         run: bash build-iso
 

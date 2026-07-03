@@ -23,16 +23,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set current date as environment variable
-        run: echo "DATE=$(date +'%Y.%m.%d')" >> "$GITHUB_ENV"
-      - name: Download Custom Profile without Git
+      - name: Checkout My Config Repo
+        uses: actions/checkout@v4
+        with:
+          repository: quantrimang123/ILV-linux
+          path: my_config_folder
+          token: ${{ secrets.GH_PAT }}
+      - name: Extract Baseline Profile
         run: |
-          pacman -Syu --noconfirm curl unzip
-          rm -rf /tmp/repo.zip /tmp/ilv-extracted baseline
-          curl -L https://github.com -o /tmp/repo.zip
-          unzip /tmp/repo.zip -d /tmp/ilv-extracted
-          cp -r /tmp/ilv-extracted/ILV-linux-master/configs/baseline .
+          rm -rf baseline ||true
+          cp -r my_config_folder/configs/baseline .
+      - name: Set current date as environment variable
+        run: echo "DATE=$(date +'%Y.%m.%d')" >> "$GITHUB_ENV" 
       - name: Run build-iso script
         run: bash build-iso
       - name: Upload artifact

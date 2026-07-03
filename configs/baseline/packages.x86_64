@@ -1,12 +1,7 @@
 base
-cloud-init
-hyperv
 linux
 mkinitcpio
 mkinitcpio-archiso
-open-vm-tools
-openssh
-pv
-qemu-guest-agent
-syslinux
-virtualbox-guest-utils-nox
+dhcpcd
+iproute2
+nano

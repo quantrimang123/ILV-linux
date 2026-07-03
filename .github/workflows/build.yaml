@@ -26,17 +26,15 @@ jobs:
 
       - name: Set current date as environment variable
         run: echo "DATE=$(date +'%Y.%m.%d')" >> "$GITHUB_ENV"
-      - name: Install Git and Clone Custom Profile
+      - name: Download Custom Profile without Git
         run: |
-          mkdir -p /tmp/ilv-repo
-          pacman -Syu --noconfirm git
-          rm -rf my-profile ||true
-          rm -rf /tmp/ilv-repo baseline ||true
-          git clone https://github.com /tmp/ilv-repo
-          cp -r /tmp/ilv-repo/configs/baseline .
+          pacman -Syu --noconfirm curl unzip
+          rm -rf /tmp/repo.zip /tmp/ilv-extracted baseline
+          curl -L https://github.com -o /tmp/repo.zip
+          unzip /tmp/repo.zip -d /tmp/ilv-extracted
+          cp -r /tmp/ilv-extracted/ILV-linux-master/configs/baseline .
       - name: Run build-iso script
         run: bash build-iso
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dev == 'true' }}

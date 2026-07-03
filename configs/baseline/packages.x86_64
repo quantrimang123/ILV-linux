@@ -6,3 +6,7 @@ dhcpcd
 iproute2
 nano
 syslinux
+grub
+memtest86+
+memtest86+-efi
+edk2-shell

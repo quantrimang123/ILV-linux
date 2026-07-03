@@ -28,9 +28,12 @@ jobs:
         run: echo "DATE=$(date +'%Y.%m.%d')" >> "$GITHUB_ENV"
       - name: Install Git and Clone Custom Profile
         run: |
+          mkdir -p /tmp/ilv-repo
           pacman -Syu --noconfirm git
           rm -rf my-profile ||true
-          git clone https://github.com/quantrimang123/ILV-linux/tree/master/configs/baseline
+          rm -rf /tmp/ilv-repo baseline ||true
+          git clone https://github.com /tmp/ilv-repo
+          cp -r /tmp/ilv-repo/configs/baseline .
       - name: Run build-iso script
         run: bash build-iso
 

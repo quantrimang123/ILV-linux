@@ -28,7 +28,7 @@ jobs:
         with:
           repository: quantrimang123/ILV-linux
           path: my_config_folder
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.SNNDAADJWD }}
       - name: Extract Baseline Profile
         run: |
           rm -rf baseline ||true

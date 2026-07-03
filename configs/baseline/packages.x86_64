@@ -5,3 +5,4 @@ mkinitcpio-archiso
 dhcpcd
 iproute2
 nano
+syslinux

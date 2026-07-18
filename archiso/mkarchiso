@@ -987,6 +987,7 @@ _validate_requirements_bootmode_uefi.systemd-boot() {
 
     # shellcheck disable=SC2076
     if [[ " ${bootmodes[*]} " =~ ' uefi.grub ' ]]; then
+        (( validation_error=validation_error+1 ))
         _msg_error "Validating '${bootmode}': cannot be used with the 'uefi.grub' bootmode!" 0
     fi
 
@@ -1039,6 +1040,7 @@ _validate_requirements_bootmode_uefi.grub() {
 
     # shellcheck disable=SC2076
     if [[ " ${bootmodes[*]} " =~ ' uefi.systemd-boot ' ]]; then
+        (( validation_error=validation_error+1 ))
         _msg_error "Validating '${bootmode}': cannot be used with the 'uefi.systemd-boot' bootmode!" 0
     fi
 

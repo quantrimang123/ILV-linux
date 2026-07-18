@@ -23,6 +23,7 @@ Deprecated
 Fixed
 -----
 
+- Reject profiles that use the ``uefi.systemd-boot`` and ``uefi.grub`` boot modes together.
 - Fixed a typo that prevented including the UEFI shell for UEFI architectures other than x64.
 
 Removed

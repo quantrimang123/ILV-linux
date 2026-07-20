@@ -95,7 +95,8 @@ usage: ${app_name} [options] <profile_dir>
                       Default: '${pacman_conf}'
      -D <install_dir> Set an install_dir. All files will be located here.
                       Default: '${install_dir}'
-                      NOTE: Max 8 characters, use only [a-z0-9]
+                      NOTE: For 'iso' and 'netboot', use only [a-z0-9].
+                            For 'iso', max 30 characters.
      -L <label>       Set the ISO volume label
                       Default: '${iso_label}'
      -P <publisher>   Set the ISO publisher
@@ -1296,6 +1297,11 @@ _validate_common_requirements_buildmode_iso_netboot() {
     local bootmode
     local pkg_list_from_file=()
 
+    if [[ ! "${install_dir}" =~ ^[a-z0-9]+$ ]]; then
+        (( validation_error=validation_error+1 ))
+        _msg_error "Validating '${_buildmode}': Invalid install_dir '${install_dir}'. Use only [a-z0-9]." 0
+    fi
+
     # Check if the package list file exists and read packages from it
     if [[ -e "${packages}" ]]; then
         mapfile -t pkg_list_from_file < <(sed '/^[[:blank:]]*#.*/d;s/#.*//;/^[[:blank:]]*$/d' "${packages}")
@@ -1345,6 +1351,10 @@ _validate_common_requirements_buildmode_iso_netboot() {
 _validate_requirements_buildmode_iso() {
     _validate_common_requirements_buildmode_iso_netboot
     _validate_common_requirements_buildmode_all
+    if (( ${#install_dir} > 30 )); then
+        (( validation_error=validation_error+1 ))
+        _msg_error "Validating '${_buildmode}': install_dir '${install_dir}' must not exceed 30 characters." 0
+    fi
     # Check if the specified bootmodes are supported
     if (( ${#bootmodes[@]} < 1 )); then
         (( validation_error=validation_error+1 ))

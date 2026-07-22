@@ -74,11 +74,11 @@ build() {
       exit 1
     fi
   "
-  step "Copying releng profile to build directory..." "cp -r /usr/share/archiso/configs/releng/* /tmp/isobuild"
-  step "Building ISO..." "mkarchiso -v -w work/ -o ./ /tmp/isobuild"
+step "Copying baseline profile to build directory..." "mkdir -p /tmp/isobuild && cp -r my_config_folder/configs/baseline/* /tmp/isobuild"
+step "Building ISO..." "mkarchiso -v -w work/ -o ./ /tmp/isobuild"
   
   # Detect the actual ISO filename
-  ISO_NAME=$(ls | grep "archlinux-.*-x86_64.iso" | head -n1)
+  ISO_NAME=$(ls | grep "ILVLinux-baseline-.*-x86_64.iso" | head -n1)
 
   step "Generating checksums text file..." "
     b2sum $ISO_NAME > CHECKSUMS.txt

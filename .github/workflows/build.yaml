@@ -1,0 +1,59 @@
+name: Build ILV Linux ISO
+
+on:
+  workflow_dispatch:
+    inputs:
+      dev:
+        description: "Run as development?"
+        type: boolean
+        required: true
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      contents: write
+
+    container:
+      image: archlinux:latest
+      options: --privileged
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout My Config Repo
+        uses: actions/checkout@v4
+        with:
+          repository: quantrimang123/ILV-linux
+          path: my_config_folder
+          token: ${{ secrets.GH_PAT }}
+      - name: Extract Baseline Profile
+        run: |
+          rm -rf baseline ||true
+          cp -r my_config_folder/configs/baseline .
+      - name: Set current date as environment variable
+        run: echo "DATE=$(date +'%Y.%m.%d')" >> "$GITHUB_ENV" 
+      - name: Install required packages
+        run: pacman -Sy grub --noconfirm
+      - name: Run build-iso script
+        run: bash build-iso
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dev == 'true' }}
+        with:
+          name: ILV Linux ${{ env.DATE }}
+          path: |
+            ILVLinux-baseline-${{ env.DATE }}-x86_64.iso
+            CHECKSUMS.txt
+      - name: Create tag and release
+        uses: softprops/action-gh-release@v2
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dev == 'false') }}
+        with:
+          name: ILV Linux ${{ env.DATE }}
+          tag_name: ${{ env.DATE }}
+          body_path: CHECKSUMS.txt
+          files: |
+            ILVLinux-baseline-${{ env.DATE }}-x86_64.iso
+            CHECKSUMS.txt

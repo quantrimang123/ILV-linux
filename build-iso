@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# ANSI escapes
+RED='\033[31m'
+GREEN='\033[32m'
+BOLD='\033[1m'
+ITALIC='\033[3m'
+STRIKETHROUGH='\033[9m'
+RESET='\033[0m'
+
+# usage: repeat character number
+# example: repeat = 10
+# output: ==========
+repeat() {
+  for ((i = 1; i < $2; i++)); do
+    echo -n "$1"
+  done
+}
+
+# usage: step text command
+# example: step "echoing hey" "echo hey"
+# output:
+# echoing hey...
+# hey
+# echoing hey... done!
+# ====================
+step() {
+  echo -e "${BOLD}$1${RESET}" &&
+    eval "$2"
+
+  if [ "${PIPESTATUS[0]}" -gt 0 ]; then
+    echo -e "${RED}${ITALIC}${STRIKETHROUGH}$1${RESET}${RED} error!${RESET}" &&
+      exit 1
+  else
+    TEXT="${GREEN}${ITALIC}${STRIKETHROUGH}$1${RESET}${GREEN} done!${RESET}"
+    echo -e "$TEXT"
+  fi
+
+  echo -e "${BOLD}$(repeat "=" "$(echo "$TEXT" | sed -E 's/\033[^\\]*m//g' | wc -c)")${RESET}"
+}
+
+build() {
+  step "Validating prerequisites..." "
+    if ! command -v pacman &>/dev/null; then
+      echo 'pacman not found — this script must run on Arch Linux' >&2
+      exit 1
+    fi
+  "
+  step "Cleaning up previous build artifacts..." "
+    [ -d /tmp/isobuild ] && rm -rf /tmp/isobuild
+    [ -d work ] && rm -rf work/
+    true
+  "
+  step "Creating build directory..." "mkdir -p /tmp/isobuild/airootfs/root"
+  step "Adding notes to .zprofile file..." "
+    cat <<-EOL >>/tmp/isobuild/airootfs/root/.zprofile
+      . /usr/share/makepkg/util/message.sh
+      colorize
+
+      echo ''
+      msg \"This is an unofficial ISO created by GitHub Actions on $DATE from run ID $GITHUB_RUN_ID\"
+      msg2 \"Check $GITHUB_SERVER_URL/$GITHUB_REPOSITORY#readme for more details\"
+      echo ''
+    EOL
+  "
+  step "Updating packages and installing archiso..." "pacman -Syu --noconfirm archiso"
+  step "Validating archiso installation..." "
+    if ! command -v mkarchiso &>/dev/null; then
+      echo 'mkarchiso not found after installing archiso — aborting' >&2
+      exit 1
+    fi
+    if [ ! -d /usr/share/archiso/configs/releng ]; then
+      echo 'releng profile not found at /usr/share/archiso/configs/releng — aborting' >&2
+      exit 1
+    fi
+  "
+step "Copying baseline profile to build directory..." "mkdir -p /tmp/isobuild && cp -r my_config_folder/configs/baseline/* /tmp/isobuild"
+step "Building ISO..." "mkarchiso -v -w work/ -o ./ /tmp/isobuild"
+  
+  # Detect the actual ISO filename
+  ISO_NAME=$(ls | grep "ILVLinux-baseline-.*-x86_64.iso" | head -n1)
+
+  step "Generating checksums text file..." "
+    b2sum $ISO_NAME > CHECKSUMS.txt
+    md5sum $ISO_NAME >> CHECKSUMS.txt
+    sha1sum $ISO_NAME >> CHECKSUMS.txt
+    sha256sum $ISO_NAME >> CHECKSUMS.txt
+  "
+}
+
+main() {
+  if [ -z ${DATE+x} ]; then
+    echo -e "${RED}DATE variable not set!${RESET}" &&
+      exit 1
+  else
+    build
+  fi
+}
+
+main

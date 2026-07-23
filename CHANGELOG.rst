@@ -28,6 +28,7 @@ Fixed
 - Stop requiring ``tune2fs`` for ``ext4+squashfs`` images.
 - Reject profiles that use the ``uefi.systemd-boot`` and ``uefi.grub`` boot modes together.
 - Fixed a typo that prevented including the UEFI shell for UEFI architectures other than x64.
+- Correctly support compressing the bootstrap tarball with bzip2.
 
 Removed
 -------

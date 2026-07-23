@@ -1849,7 +1849,7 @@ _build() {
     done
     if (( rm_work_dir )); then
         _msg_info 'Removing the working directory...'
-        rm -rf -- "${work_dir:?}/"
+        _unshare rm -rf -- "${work_dir:?}/"
         _msg_info 'Done!'
     fi
 }
